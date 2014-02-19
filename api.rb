@@ -39,54 +39,65 @@ get '/users' do
   users = @neo.get_nodes_labeled("User")
   result = { :users => []}
   users.each do |user|
-    result[:users] << { :id => user["data"]["userid"],
-    	                :name => user["data"]["name"],
-                        :self => "http://localhost:5000/users/"+ /\d+$/.match(user["self"])[0]}
+    result[:users] << { :id => user["data"]["id"],
+    	                :name => user["data"]["display_name"],
+                        :@links => {
+                        :self => { :href => "http://localhost:5000/users/"+ user["data"]["id"]}
+                        }
+                      }
   end
   result.to_json
-
 end
 
+post '/users' do
+  @logger = Logger.new(STDERR)
+  @logger.level = Logger::INFO
+  @neo = Neography::Rest.new
+
+  request.body.rewind
+  ud = JSON.parse(request.body.read,{:symbolize_names => true})
+ user_node = Neography::Node.create( "id" => ud[:id],
+                                      "username" => ud[:username],
+                                      "display_name" => ud[:display_name],
+                                      "profile_photo_s3id" => ud[:profile_photo_s3id],
+                                      "bio_statement" => ud[:bio_statement],
+                                      "location" => ud[:location],
+                                      "user_type" => ud[:user_type] )
+ user_node.add_to_index("user_index", "id", ud[:id])
+ @neo.add_label(user_node, "User")
+ "posted user"
+end
+
+get '/users/index' do
+  @neo = Neography::Rest.new
+  @neo.create_schema_index("User","id")
+  "I think I created an index"
+end
+
+
 get '/users/:userid' do
-@logger = Logger.new(STDOUT)
+@logger = Logger.new(STDERR)
 @logger.level = Logger::INFO
 
   @neo = Neography::Rest.new
-  user = Neography::Node.load(4)
- result = { :users => []}
-  result[:users] << { :id => user.userid,
-    	                :name => user.name,
-                        :self => "http://localhost:5000/users/" + user.neo_id}
+ # user = Neography::Node.load(4)
+  @logger.info(@neo.list_node_indexes)
+  @logger.info("Userid: " + params[:userid] + " of type " + params[:userid].class.to_s)
+  res = Neography::Node.find("user_index", "id", params[:userid])
+  unless res.instance_of?(Array) then user = [res] end
+  @logger.info("Found: " + user.to_s)
+  result = { :users => []}
+  result[:users] << { :id => user[0].id,
+    	                :name => user[0].display_name,
+                        :@links => {
+                          :self => { :href => "http://localhost:5000/users/" + user[0].id}
+                        }
+                      }
   result.to_json
 
 end
 
-get '/users/:userid/items' do
+get '/users/:userid/cards' do
 
 end
-
-get 'users/:userid/items?rel=:relationship' do
-
-end
-
-get 'users/:userid/items?coll=:collectionid' do
-
-end
-
-get 'users/:userid/items?tags=:tags' do
-
-end
-
-get '/users/:userid/items/:itemid' do
-
-end
-
-get '/items' do
-
-end
-
-get '/items/:id' do
-
-end
-
 
