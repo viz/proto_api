@@ -1,4 +1,3 @@
-require './api'
+require './booodlapi'
 
-run Rack::URLMap.new \
-  "/"       => Sinatra::Application
+run BooodlApi
